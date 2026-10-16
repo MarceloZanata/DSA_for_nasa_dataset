@@ -28,8 +28,8 @@ int item_get_column_index(const Item *item, const char *col_name);
 DataType item_get_value_type(const Item *item, int index);
 
 bool item_get_value_bool(const Item *item, int index);
-int item_get_value_int(const Item *item, int index);
-float item_get_value_float(const Item *item, int index);
+long long item_get_value_int(const Item *item, int index);   // int64
+double item_get_value_float(const Item *item, int index);    // float64
 bool item_get_value_as_double(const Item *item, int index, double *out_val);
 const char* item_get_value_string(const Item *item, int index);
 

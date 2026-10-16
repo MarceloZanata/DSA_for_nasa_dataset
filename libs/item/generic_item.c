@@ -1,19 +1,19 @@
-#define _DEFAULT_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
 #include <stdbool.h>
 #include "generic_item.h"
 
-#define MAX_LINE_LEN 2048
-#define INITIAL_CAPACITY 10
+#define MAX_LINE_LEN 8192
+#define INITIAL_CAPACITY 1024
 
 struct value_ {
     DataType type;
     union {
-        int i_val;
-        float f_val;
+        long long i_val;
+        double f_val;
         bool b_val;
         char *s_val;
     } data;
@@ -29,6 +29,37 @@ typedef struct {
     char **raw_fields;
 } RawRow;
 
+/* ------------------------------------------------------------------ */
+/* Utilitários internos (sem depender de extensões POSIX)              */
+/* ------------------------------------------------------------------ */
+
+static void *xmalloc(size_t n) {
+    void *p = malloc(n ? n : 1);
+    if (!p) { fprintf(stderr, "erro: sem memoria\n"); exit(EXIT_FAILURE); }
+    return p;
+}
+
+static void *xrealloc(void *ptr, size_t n) {
+    void *p = realloc(ptr, n ? n : 1);
+    if (!p) { fprintf(stderr, "erro: sem memoria\n"); exit(EXIT_FAILURE); }
+    return p;
+}
+
+static char *dup_str(const char *s) {
+    size_t n = strlen(s) + 1;
+    char *p = (char *) xmalloc(n);
+    memcpy(p, s, n);
+    return p;
+}
+
+static bool equals_ignore_case(const char *a, const char *b) {
+    while (*a && *b) {
+        if (tolower((unsigned char)*a) != tolower((unsigned char)*b)) return false;
+        a++; b++;
+    }
+    return *a == '\0' && *b == '\0';
+}
+
 const char* dtype_to_string(DataType type) {
     switch (type) {
         case TYPE_INT:    return "int64";
@@ -40,73 +71,111 @@ const char* dtype_to_string(DataType type) {
     }
 }
 
-char* trim_whitespace(char *str) {
-    while (isspace((unsigned char)*str)) str++;
-    if (*str == 0) return str;
-    char *end = str + strlen(str) - 1;
-    while (end > str && isspace((unsigned char)*end)) end--;
-    end[1] = '\0';
-    return str;
-}
+/* ------------------------------------------------------------------ */
+/* Parser de CSV (RFC 4180: campos entre aspas podem conter virgulas)  */
+/* ------------------------------------------------------------------ */
 
-int parse_csv_line(char *line, char **out_fields, int max_fields) {
-    int count = 0;
-    char *ptr = line;
-    char *start = ptr;
-
-    while (count < max_fields) {
-        if (*ptr == ',' || *ptr == '\0') {
-            bool is_end = (*ptr == '\0');
-            *ptr = '\0';
-            
-            // O trim_whitespace DEVE ser chamado em cada campo individual aqui!
-            out_fields[count++] = strdup(trim_whitespace(start));
-            
-            if (is_end) break;
-            start = ptr + 1;
-        }
-        ptr++;
+/* Conta os campos de uma linha respeitando aspas. */
+static int count_csv_fields(const char *line) {
+    int count = 1;
+    bool quoted = false;
+    for (const char *p = line; *p; p++) {
+        if (*p == '"') quoted = !quoted;   /* "" escapado alterna duas vezes */
+        else if (*p == ',' && !quoted) count++;
     }
     return count;
 }
 
+/*
+ * Separa a linha em ate max_fields campos. Cada campo e alocado (strdup),
+ * sem as aspas externas, com "" convertido em " e sem espacos nas pontas
+ * (espacos dentro de aspas sao preservados). Campos faltantes viram "".
+ * Retorna quantos campos existiam de fato na linha.
+ */
+static int parse_csv_line(const char *line, char **out_fields, int max_fields) {
+    int count = 0;
+    const char *p = line;
+    size_t cap = strlen(line) + 1;
+
+    while (count < max_fields) {
+        char *buf = (char *) xmalloc(cap);
+        size_t n = 0, keep = 0;
+        bool quoted = false, had_quote = false;
+
+        while (*p == ' ' || *p == '\t') p++;
+
+        for (;; p++) {
+            char c = *p;
+            if (quoted) {
+                if (c == '\0') break;                      /* aspa nao fechada */
+                if (c == '"') {
+                    if (p[1] == '"') { buf[n++] = '"'; p++; }
+                    else { quoted = false; keep = n; }
+                } else {
+                    buf[n++] = c;
+                }
+            } else {
+                if (c == ',' || c == '\0') break;
+                if (c == '"' && n == 0 && !had_quote) { quoted = true; had_quote = true; }
+                else buf[n++] = c;
+            }
+        }
+
+        while (n > keep && isspace((unsigned char)buf[n - 1])) n--;
+        buf[n] = '\0';
+        out_fields[count++] = buf;
+
+        if (*p == '\0') break;
+        p++;                                               /* pula a virgula */
+    }
+
+    int found = count;
+    while (count < max_fields) out_fields[count++] = dup_str("");
+    return found;
+}
+
+/* ------------------------------------------------------------------ */
+/* Inferencia de tipos                                                 */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Aceita: [sinal] digitos [. digitos] [e|E [sinal] digitos]
+ * (inclui notacao cientifica, ex.: 8.95e-05). Rejeita inf/nan/hex.
+ */
 DataType infer_single_type(const char *str) {
     if (str == NULL || *str == '\0') return TYPE_NULL;
 
-    // Criamos uma cópia local ou ajustamos ponteiros para ignorar aspas nas pontas se existirem
-    char cleaned[128];
-    int len = strlen(str);
-    int start = 0, end = len - 1;
+    if (equals_ignore_case(str, "true") || equals_ignore_case(str, "false")) return TYPE_BOOL;
 
-    if (str[0] == '"' && str[end] == '"' && len >= 2) {
-        start++;
-        end--;
+    const char *p = str;
+    bool is_float = false;
+    int mantissa_digits = 0;
+
+    if (*p == '-' || *p == '+') p++;
+    while (isdigit((unsigned char)*p)) { p++; mantissa_digits++; }
+    if (*p == '.') {
+        is_float = true;
+        p++;
+        while (isdigit((unsigned char)*p)) { p++; mantissa_digits++; }
     }
+    if (mantissa_digits == 0) return TYPE_STRING;
 
-    int j = 0;
-    for (int i = start; i <= end; i++) {
-        cleaned[j++] = str[i];
+    if (*p == 'e' || *p == 'E') {
+        is_float = true;
+        p++;
+        if (*p == '-' || *p == '+') p++;
+        if (!isdigit((unsigned char)*p)) return TYPE_STRING;
+        while (isdigit((unsigned char)*p)) p++;
     }
-    cleaned[j] = '\0';
+    if (*p != '\0') return TYPE_STRING;
 
-    if (cleaned[0] == '\0') return TYPE_NULL;
-    if (strcasecmp(cleaned, "true") == 0 || strcasecmp(cleaned, "false") == 0) return TYPE_BOOL;
-
-    int has_decimal = 0;
-    int i = 0;
-
-    if (cleaned[0] == '-' || cleaned[0] == '+') i++;
-    if (cleaned[i] == '\0') return TYPE_STRING;
-
-    for (; cleaned[i] != '\0'; i++) {
-        if (cleaned[i] == '.') {
-            if (has_decimal) return TYPE_STRING;
-            has_decimal = 1;
-        } else if (!isdigit((unsigned char)cleaned[i])) {
-            return TYPE_STRING;
-        }
+    if (!is_float) {
+        errno = 0;
+        strtoll(str, NULL, 10);
+        if (errno == ERANGE) return TYPE_FLOAT;            /* inteiro grande demais */
+        return TYPE_INT;
     }
-    return has_decimal ? TYPE_FLOAT : TYPE_INT;
+    return TYPE_FLOAT;
 }
 
 DataType promote_type(DataType current_type, DataType new_type) {
@@ -124,51 +193,51 @@ DataType promote_type(DataType current_type, DataType new_type) {
 Value parse_value_with_type(const char *raw_text, DataType col_type) {
     Value val;
     val.type = col_type;
+    val.data.s_val = NULL;
 
     if (raw_text == NULL || *raw_text == '\0') {
         val.type = TYPE_NULL;
-        val.data.s_val = NULL;
         return val;
     }
 
     switch (col_type) {
         case TYPE_BOOL:
-            val.data.b_val = (strcasecmp(raw_text, "true") == 0 || strcmp(raw_text, "1") == 0);
+            val.data.b_val = equals_ignore_case(raw_text, "true") || strcmp(raw_text, "1") == 0;
             break;
         case TYPE_INT:
-            val.data.i_val = atoi(raw_text);
+            val.data.i_val = strtoll(raw_text, NULL, 10);
             break;
         case TYPE_FLOAT:
-            val.data.f_val = (float)atof(raw_text);
+            val.data.f_val = strtod(raw_text, NULL);
             break;
         case TYPE_STRING:
         default:
             val.type = TYPE_STRING;
-            val.data.s_val = strdup(raw_text);
+            val.data.s_val = dup_str(raw_text);
             break;
     }
     return val;
 }
 
+/* ------------------------------------------------------------------ */
+/* Impressao e liberacao                                               */
+/* ------------------------------------------------------------------ */
+
 void item_print(const Item *item) {
     if (!item) return;
     printf("{\n");
     for (int i = 0; i < item->num_fields; i++) {
-        printf("  \"%-18s\": ", item->keys[i]);
-        if (item->values[i].type == TYPE_NULL) {
-            printf("%-15s", "null");
-        } else if (item->values[i].type == TYPE_BOOL) {
-            printf("%-15s", item->values[i].data.b_val ? "true" : "false");
-        } else if (item->values[i].type == TYPE_INT) {
-            printf("%-15d", item->values[i].data.i_val);
-        } else if (item->values[i].type == TYPE_FLOAT) {
-            printf("%-15.6f", item->values[i].data.f_val);
-        } else {
-            char buffer[64];
-            snprintf(buffer, sizeof(buffer), "\"%s\"", item->values[i].data.s_val);
-            printf("%-15s", buffer);
+        char buffer[512];
+        const Value *v = &item->values[i];
+
+        switch (v->type) {
+            case TYPE_NULL:   snprintf(buffer, sizeof(buffer), "null"); break;
+            case TYPE_BOOL:   snprintf(buffer, sizeof(buffer), "%s", v->data.b_val ? "true" : "false"); break;
+            case TYPE_INT:    snprintf(buffer, sizeof(buffer), "%lld", v->data.i_val); break;
+            case TYPE_FLOAT:  snprintf(buffer, sizeof(buffer), "%.15g", v->data.f_val); break;
+            default:          snprintf(buffer, sizeof(buffer), "\"%s\"", v->data.s_val); break;
         }
-        printf(" [%s]\n", dtype_to_string(item->values[i].type));
+        printf("  \"%-20s\": %-32s [%s]\n", item->keys[i], buffer, dtype_to_string(v->type));
     }
     printf("}\n");
 }
@@ -186,7 +255,13 @@ void item_free(Item *item) {
     free(item);
 }
 
+/* ------------------------------------------------------------------ */
+/* Leitura do arquivo                                                  */
+/* ------------------------------------------------------------------ */
+
 Item** read_csv_to_items(const char *filename, int *out_num_rows) {
+    if (out_num_rows) *out_num_rows = 0;
+
     FILE *file = fopen(filename, "r");
     if (!file) return NULL;
 
@@ -198,32 +273,34 @@ Item** read_csv_to_items(const char *filename, int *out_num_rows) {
 
     line[strcspn(line, "\r\n")] = 0;
 
-    int num_cols = 0;
-    for (char *p = line; *p; p++) {
-        if (*p == ',') num_cols++;
+    /* ignora BOM UTF-8 no inicio do arquivo */
+    char *header_line = line;
+    if ((unsigned char)header_line[0] == 0xEF && (unsigned char)header_line[1] == 0xBB &&
+        (unsigned char)header_line[2] == 0xBF) {
+        header_line += 3;
     }
-    num_cols++;
 
-    char **headers = (char**) malloc(num_cols * sizeof(char*));
-    parse_csv_line(line, headers, num_cols);
+    int num_cols = count_csv_fields(header_line);
+    char **headers = (char**) xmalloc(num_cols * sizeof(char*));
+    parse_csv_line(header_line, headers, num_cols);
 
     int capacity = INITIAL_CAPACITY;
     int num_rows = 0;
-    RawRow *raw_rows = (RawRow*) malloc(capacity * sizeof(RawRow));
+    RawRow *raw_rows = (RawRow*) xmalloc(capacity * sizeof(RawRow));
 
-    DataType *column_types = (DataType*) malloc(num_cols * sizeof(DataType));
+    DataType *column_types = (DataType*) xmalloc(num_cols * sizeof(DataType));
     for (int i = 0; i < num_cols; i++) column_types[i] = TYPE_NULL;
 
     while (fgets(line, sizeof(line), file)) {
         line[strcspn(line, "\r\n")] = 0;
-        if (strlen(line) == 0) continue;
+        if (line[0] == '\0') continue;
 
         if (num_rows >= capacity) {
             capacity *= 2;
-            raw_rows = (RawRow*) realloc(raw_rows, capacity * sizeof(RawRow));
+            raw_rows = (RawRow*) xrealloc(raw_rows, capacity * sizeof(RawRow));
         }
 
-        raw_rows[num_rows].raw_fields = (char**) malloc(num_cols * sizeof(char*));
+        raw_rows[num_rows].raw_fields = (char**) xmalloc(num_cols * sizeof(char*));
         parse_csv_line(line, raw_rows[num_rows].raw_fields, num_cols);
 
         for (int i = 0; i < num_cols; i++) {
@@ -238,16 +315,16 @@ Item** read_csv_to_items(const char *filename, int *out_num_rows) {
         if (column_types[i] == TYPE_NULL) column_types[i] = TYPE_STRING;
     }
 
-    Item **items = (Item**) malloc(num_rows * sizeof(Item*));
+    Item **items = (Item**) xmalloc(num_rows * sizeof(Item*));
 
     for (int r = 0; r < num_rows; r++) {
-        Item *new_item = (Item*) malloc(sizeof(Item));
+        Item *new_item = (Item*) xmalloc(sizeof(Item));
         new_item->num_fields = num_cols;
-        new_item->keys = (char**) malloc(num_cols * sizeof(char*));
-        new_item->values = (Value*) malloc(num_cols * sizeof(Value));
+        new_item->keys = (char**) xmalloc(num_cols * sizeof(char*));
+        new_item->values = (Value*) xmalloc(num_cols * sizeof(Value));
 
         for (int c = 0; c < num_cols; c++) {
-            new_item->keys[c] = strdup(headers[c]);
+            new_item->keys[c] = dup_str(headers[c]);
             new_item->values[c] = parse_value_with_type(raw_rows[r].raw_fields[c], column_types[c]);
             free(raw_rows[r].raw_fields[c]);
         }
@@ -260,13 +337,20 @@ Item** read_csv_to_items(const char *filename, int *out_num_rows) {
     free(raw_rows);
     free(column_types);
 
-    *out_num_rows = num_rows;
+    if (out_num_rows) *out_num_rows = num_rows;
     return items;
 }
 
-// Getters
+/* ------------------------------------------------------------------ */
+/* Getters                                                             */
+/* ------------------------------------------------------------------ */
+
+static bool valid_index(const Item *item, int index) {
+    return item && index >= 0 && index < item->num_fields;
+}
+
 int item_get_num_fields(const Item *item) { return item ? item->num_fields : 0; }
-const char* item_get_key(const Item *item, int index) { return (!item || index < 0 || index >= item->num_fields) ? NULL : item->keys[index]; }
+const char* item_get_key(const Item *item, int index) { return valid_index(item, index) ? item->keys[index] : NULL; }
 int item_get_column_index(const Item *item, const char *col_name) {
     if (!item || !col_name) return -1;
     for (int i = 0; i < item->num_fields; i++) {
@@ -274,15 +358,18 @@ int item_get_column_index(const Item *item, const char *col_name) {
     }
     return -1;
 }
-DataType item_get_value_type(const Item *item, int index) { return (!item || index < 0 || index >= item->num_fields) ? TYPE_NULL : item->values[index].type; }
-bool item_get_value_bool(const Item *item, int index) { return (!item || index < 0 || index >= item->num_fields) ? false : item->values[index].data.b_val; }
-int item_get_value_int(const Item *item, int index) { return (!item || index < 0 || index >= item->num_fields) ? 0 : item->values[index].data.i_val; }
-float item_get_value_float(const Item *item, int index) { return (!item || index < 0 || index >= item->num_fields) ? 0.0f : item->values[index].data.f_val; }
+DataType item_get_value_type(const Item *item, int index) { return valid_index(item, index) ? item->values[index].type : TYPE_NULL; }
+bool item_get_value_bool(const Item *item, int index) { return valid_index(item, index) ? item->values[index].data.b_val : false; }
+long long item_get_value_int(const Item *item, int index) { return valid_index(item, index) ? item->values[index].data.i_val : 0; }
+double item_get_value_float(const Item *item, int index) { return valid_index(item, index) ? item->values[index].data.f_val : 0.0; }
 bool item_get_value_as_double(const Item *item, int index, double *out_val) {
-    if (!item || index < 0 || index >= item->num_fields || !out_val) return false;
+    if (!valid_index(item, index) || !out_val) return false;
     DataType type = item->values[index].type;
-    if (type == TYPE_INT) { *out_val = (double)item->values[index].data.i_val; return true; }
-    if (type == TYPE_FLOAT) { *out_val = (double)item->values[index].data.f_val; return true; }
+    if (type == TYPE_INT)   { *out_val = (double)item->values[index].data.i_val; return true; }
+    if (type == TYPE_FLOAT) { *out_val = item->values[index].data.f_val; return true; }
     return false;
 }
-const char* item_get_value_string(const Item *item, int index) { return (!item || index < 0 || index >= item->num_fields) ? NULL : item->values[index].data.s_val; }
+const char* item_get_value_string(const Item *item, int index) {
+    if (!valid_index(item, index) || item->values[index].type != TYPE_STRING) return NULL;
+    return item->values[index].data.s_val;
+}
