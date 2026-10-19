@@ -223,7 +223,7 @@ Value parse_value_with_type(const char *raw_text, DataType col_type) {
 /* Impressao e liberacao                                               */
 /* ------------------------------------------------------------------ */
 
-void item_print(const Item *item) {
+void item_print(const ITEM *item) {
     if (!item) return;
     printf("{\n");
     for (int i = 0; i < item->num_fields; i++) {
@@ -242,7 +242,7 @@ void item_print(const Item *item) {
     printf("}\n");
 }
 
-void item_free(Item *item) {
+void item_free(ITEM *item) {
     if (!item) return;
     for (int i = 0; i < item->num_fields; i++) {
         free(item->keys[i]);
@@ -259,7 +259,7 @@ void item_free(Item *item) {
 /* Leitura do arquivo                                                  */
 /* ------------------------------------------------------------------ */
 
-Item** read_csv_to_items(const char *filename, int *out_num_rows) {
+ITEM** read_csv_to_items(const char *filename, int *out_num_rows) {
     if (out_num_rows) *out_num_rows = 0;
 
     FILE *file = fopen(filename, "r");
@@ -315,10 +315,10 @@ Item** read_csv_to_items(const char *filename, int *out_num_rows) {
         if (column_types[i] == TYPE_NULL) column_types[i] = TYPE_STRING;
     }
 
-    Item **items = (Item**) xmalloc(num_rows * sizeof(Item*));
+    ITEM **items = (ITEM**) xmalloc(num_rows * sizeof(ITEM*));
 
     for (int r = 0; r < num_rows; r++) {
-        Item *new_item = (Item*) xmalloc(sizeof(Item));
+        ITEM *new_item = (ITEM*) xmalloc(sizeof(ITEM));
         new_item->num_fields = num_cols;
         new_item->keys = (char**) xmalloc(num_cols * sizeof(char*));
         new_item->values = (Value*) xmalloc(num_cols * sizeof(Value));
@@ -345,31 +345,31 @@ Item** read_csv_to_items(const char *filename, int *out_num_rows) {
 /* Getters                                                             */
 /* ------------------------------------------------------------------ */
 
-static bool valid_index(const Item *item, int index) {
+static bool valid_index(const ITEM *item, int index) {
     return item && index >= 0 && index < item->num_fields;
 }
 
-int item_get_num_fields(const Item *item) { return item ? item->num_fields : 0; }
-const char* item_get_key(const Item *item, int index) { return valid_index(item, index) ? item->keys[index] : NULL; }
-int item_get_column_index(const Item *item, const char *col_name) {
+int item_get_num_fields(const ITEM *item) { return item ? item->num_fields : 0; }
+const char* item_get_key(const ITEM *item, int index) { return valid_index(item, index) ? item->keys[index] : NULL; }
+int item_get_column_index(const ITEM *item, const char *col_name) {
     if (!item || !col_name) return -1;
     for (int i = 0; i < item->num_fields; i++) {
         if (strcmp(item->keys[i], col_name) == 0) return i;
     }
     return -1;
 }
-DataType item_get_value_type(const Item *item, int index) { return valid_index(item, index) ? item->values[index].type : TYPE_NULL; }
-bool item_get_value_bool(const Item *item, int index) { return valid_index(item, index) ? item->values[index].data.b_val : false; }
-long long item_get_value_int(const Item *item, int index) { return valid_index(item, index) ? item->values[index].data.i_val : 0; }
-double item_get_value_float(const Item *item, int index) { return valid_index(item, index) ? item->values[index].data.f_val : 0.0; }
-bool item_get_value_as_double(const Item *item, int index, double *out_val) {
+DataType item_get_value_type(const ITEM *item, int index) { return valid_index(item, index) ? item->values[index].type : TYPE_NULL; }
+bool item_get_value_bool(const ITEM *item, int index) { return valid_index(item, index) ? item->values[index].data.b_val : false; }
+long long item_get_value_int(const ITEM *item, int index) { return valid_index(item, index) ? item->values[index].data.i_val : 0; }
+double item_get_value_float(const ITEM *item, int index) { return valid_index(item, index) ? item->values[index].data.f_val : 0.0; }
+bool item_get_value_as_double(const ITEM *item, int index, double *out_val) {
     if (!valid_index(item, index) || !out_val) return false;
     DataType type = item->values[index].type;
     if (type == TYPE_INT)   { *out_val = (double)item->values[index].data.i_val; return true; }
     if (type == TYPE_FLOAT) { *out_val = item->values[index].data.f_val; return true; }
     return false;
 }
-const char* item_get_value_string(const Item *item, int index) {
+const char* item_get_value_string(const ITEM *item, int index) {
     if (!valid_index(item, index) || item->values[index].type != TYPE_STRING) return NULL;
     return item->values[index].data.s_val;
 }
