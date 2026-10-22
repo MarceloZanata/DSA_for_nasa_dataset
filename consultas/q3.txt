@@ -1,0 +1,5 @@
+FILTER|is_past_event|==|true
+FILTER|distance_au|<=|0.05
+ORDER|close_approach_date|DESC
+GROUP|panic_level|year
+CROSS|threat_category|year

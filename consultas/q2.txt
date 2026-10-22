@@ -1,0 +1,6 @@
+  FILTER|on_sentry_list|==|true
+  SIM|sentry_diameter_km|0.50|0.50|1.0
+  ACCEPT|0.30
+  ORDER|sentry_diameter_km|DESC
+  GROUP|threat_category|year
+  CROSS|threat_category|year
