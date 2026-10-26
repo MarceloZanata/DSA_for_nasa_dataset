@@ -18,4 +18,4 @@ void pilha_imprimir(PILHA *pilha);
 void pilha_inverter(PILHA *pilha);
 void pilha_percorrer(const PILHA *pilha, void (*callback)(ITEM *item, void *dados_extras), void *dados_extras);
 
-#endif /* PILHA_H */
+#endif

@@ -7,9 +7,9 @@
 #define MAX_VAL_STR 128
 
 typedef struct no_cruzado_ {
-    ITEM *item;                     /* Ponteiro único para o registro compartilhado */
-    struct no_cruzado_ *prox_eixo1; /* Encadeamento na dimensão 1 */
-    struct no_cruzado_ *prox_eixo2; /* Encadeamento na dimensão 2 */
+    ITEM *item;                     // Ponteiro único para o registro compartilhado
+    struct no_cruzado_ *prox_eixo1; // Encadeamento na dimensão 1
+    struct no_cruzado_ *prox_eixo2; // Encadeamento na dimensão 2
 } NoCruzado;
 
 typedef struct cabeca_eixo_ {
@@ -27,6 +27,7 @@ struct lista_cruz {
     int tamanho;
 };
 
+// Retorna valor do campo
 static void extrair_valor_campo(const ITEM *item, const char *campo, char *out_val, size_t max_len) {
     out_val[0] = '\0';
     if (!item || !campo) return;
@@ -51,6 +52,7 @@ static void extrair_valor_campo(const ITEM *item, const char *campo, char *out_v
     }
 }
 
+// Retorna eixo
 static CabecaEixo* obter_ou_criar_eixo(CabecaEixo **raiz, const char *valor) {
     CabecaEixo *atual = *raiz;
     CabecaEixo *ant = NULL;
@@ -76,6 +78,7 @@ static CabecaEixo* obter_ou_criar_eixo(CabecaEixo **raiz, const char *valor) {
     return atual;
 }
 
+// Construtor
 ListaCruz* lista_cruz_criar(const char *campo_eixo1, const char *campo_eixo2) {
     ListaCruz *lista = (ListaCruz*) malloc(sizeof(ListaCruz));
     if (lista != NULL) {
@@ -88,6 +91,7 @@ ListaCruz* lista_cruz_criar(const char *campo_eixo1, const char *campo_eixo2) {
     return lista;
 }
 
+// Destrutor
 void lista_cruz_apagar(ListaCruz **lista) {
     if (lista == NULL || *lista == NULL) return;
 
@@ -122,6 +126,7 @@ void lista_cruz_apagar(ListaCruz **lista) {
     *lista = NULL;
 }
 
+// Insere na lista cruzada
 bool lista_cruz_inserir(ListaCruz *lista, ITEM *item) {
     if (lista == NULL || item == NULL) return false;
 
@@ -164,14 +169,17 @@ bool lista_cruz_inserir(ListaCruz *lista, ITEM *item) {
     return true;
 }
 
+// Retorna o tamanho d lista
 int lista_cruz_tamanho(const ListaCruz *lista) {
     return (lista != NULL) ? lista->tamanho : 0;
 }
 
+// Verificação se a lista é vazia
 bool lista_cruz_vazia(const ListaCruz *lista) {
     return (lista == NULL || lista->tamanho == 0);
 }
 
+// Percorre o eixo
 void lista_cruz_percorrer_eixo1(const ListaCruz *lista, void (*callback)(ITEM *item, void *dados_extras), void *dados_extras) {
     if (lista == NULL || callback == NULL) return;
 
@@ -182,6 +190,7 @@ void lista_cruz_percorrer_eixo1(const ListaCruz *lista, void (*callback)(ITEM *i
     }
 }
 
+// Percorre o eixo
 void lista_cruz_percorrer_eixo2(const ListaCruz *lista, void (*callback)(ITEM *item, void *dados_extras), void *dados_extras) {
     if (lista == NULL || callback == NULL) return;
 

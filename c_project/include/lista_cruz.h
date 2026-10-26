@@ -14,4 +14,4 @@ bool lista_cruz_vazia(const ListaCruz *lista);
 void lista_cruz_percorrer_eixo1(const ListaCruz *lista, void (*callback)(ITEM *item, void *dados_extras), void *dados_extras);
 void lista_cruz_percorrer_eixo2(const ListaCruz *lista, void (*callback)(ITEM *item, void *dados_extras), void *dados_extras);
 
-#endif /* LISTA_CRUZ_H */
+#endif

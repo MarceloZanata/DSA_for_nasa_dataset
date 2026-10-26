@@ -16,4 +16,4 @@ void query_get_cross_keys(const Query *q, char *out_k1, char *out_k2, size_t max
 bool query_has_group(const Query *q);
 bool query_has_cross(const Query *q);
 
-#endif /* GENERIC_SEARCH_H */
+#endif

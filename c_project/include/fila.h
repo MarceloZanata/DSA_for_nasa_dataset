@@ -17,4 +17,4 @@ bool fila_cheia(FILA *fila);
 void fila_imprimir(FILA *fila);
 void fila_percorrer(const FILA *fila, void (*callback)(ITEM *item, void *dados_extras), void *dados_extras);
 
-#endif /* FILA_H */
+#endif

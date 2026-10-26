@@ -13,4 +13,4 @@ int lista_ord_tamanho(const ListaOrd *lista);
 bool lista_ord_vazia(const ListaOrd *lista);
 void lista_ord_percorrer(const ListaOrd *lista, void (*callback)(ITEM *item, void *dados_extras), void *dados_extras);
 
-#endif /* LISTA_ORD_H */
+#endif

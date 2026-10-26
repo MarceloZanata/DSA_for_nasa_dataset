@@ -6,23 +6,27 @@
 
 #define MAX_VAL_STR 128
 
+// Estrutura do nó
 typedef struct no_item_ {
     ITEM *item;
     struct no_item_ *prox;
 } NoItem;
 
+// Subgrupo da lista generalizada
 typedef struct subgrupo_ {
     char valor_subgrupo[MAX_VAL_STR];
     NoItem *itens;
     struct subgrupo_ *prox;
 } Subgrupo;
 
+// Grupo 
 typedef struct grupo_ {
     char valor_grupo[MAX_VAL_STR];
     Subgrupo *subgrupos;
     struct grupo_ *prox;
 } Grupo;
 
+// Estrutura geral da lista generalizada
 struct lista_gen {
     Grupo *raiz;
     char *campo_grupo1;
@@ -30,6 +34,7 @@ struct lista_gen {
     int total_itens;
 };
 
+// PEga valor do campo
 static void extrair_valor_campo(const ITEM *item, const char *campo, char *out_val, size_t max_len) {
     out_val[0] = '\0';
     if (!item || !campo) return;
@@ -54,23 +59,27 @@ static void extrair_valor_campo(const ITEM *item, const char *campo, char *out_v
     }
 }
 
+// Construtor
 ListaGen* lista_gen_criar(const char *campo_grupo1, const char *campo_grupo2) {
     ListaGen *lista = (ListaGen*) malloc(sizeof(ListaGen));
     if (lista != NULL) {
         lista->raiz = NULL;
         lista->total_itens = 0;
-        lista->campo_grupo1 = campo_grupo1 ? strdup(campo_grupo1) : strdup("threat_category");
-        lista->campo_grupo2 = campo_grupo2 ? strdup(campo_grupo2) : strdup("year");
+        lista->campo_grupo1 = campo_grupo1 ? strdup(campo_grupo1) : strdup("x");
+        lista->campo_grupo2 = campo_grupo2 ? strdup(campo_grupo2) : strdup("y");
     }
     return lista;
 }
 
+// Destrutor
 void lista_gen_apagar(ListaGen **lista) {
     if (lista == NULL || *lista == NULL) return;
 
     Grupo *g = (*lista)->raiz;
     while (g != NULL) {
         Subgrupo *s = g->subgrupos;
+
+        // Remove os itens dos subgrupos
         while (s != NULL) {
             NoItem *ni = s->itens;
             while (ni != NULL) {
@@ -85,19 +94,23 @@ void lista_gen_apagar(ListaGen **lista) {
             s = s->prox;
             free(t_s);
         }
+
+        // Remove o grupo
         Grupo *t_g = g;
         g = g->prox;
         free(t_g);
     }
 
+    // Libera a memoria da lista
     free((*lista)->campo_grupo1);
     free((*lista)->campo_grupo2);
     free(*lista);
     *lista = NULL;
 }
 
+
 bool lista_gen_inserir(ListaGen *lista, ITEM *item) {
-    if (lista == NULL || item == NULL) return false;
+    if (lista == NULL || item == NULL) return false;    // Verifica se a lista é valida
 
     char v1[MAX_VAL_STR], v2[MAX_VAL_STR];
     extrair_valor_campo(item, lista->campo_grupo1, v1, sizeof(v1));

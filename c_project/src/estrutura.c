@@ -12,12 +12,14 @@
 #include "lista_gen.h"
 #include "lista_cruz.h"
 
+// Estrutura escolhida na base ou no output
 struct estrutura_t {
     TipoEstrutura tipo;
     char *nome;
     void *instancia;
 };
 
+//Identifica o tipo da estrutura de dados requisitada com base no enum localizado no .h
 static TipoEstrutura identificar_tipo(const char *nome) {
     if (!nome) return EST_DESCONHECIDA;
     if (strcmp(nome, "pilha") == 0) return EST_PILHA;
@@ -31,9 +33,10 @@ static TipoEstrutura identificar_tipo(const char *nome) {
     return EST_DESCONHECIDA;
 }
 
+// Construtor
 Estrutura* estrutura_criar(const char *nome, const Query *q) {
     TipoEstrutura tipo = identificar_tipo(nome);
-    if (tipo == EST_DESCONHECIDA) return NULL;
+    if (tipo == EST_DESCONHECIDA) return NULL; // Valida o tipo da estrutura
 
     Estrutura *est = (Estrutura *) malloc(sizeof(Estrutura));
     if (!est) return NULL;
@@ -42,6 +45,7 @@ Estrutura* estrutura_criar(const char *nome, const Query *q) {
     est->nome = strdup(nome);
     est->instancia = NULL;
 
+    // A partir do tipo, inicializa a respectiva estrutura
     switch (tipo) {
         case EST_PILHA:
             est->instancia = pilha_criar();
@@ -65,13 +69,13 @@ Estrutura* estrutura_criar(const char *nome, const Query *q) {
             break;
         }
         case EST_LISTA_GEN: {
-            char k1[128] = "threat_category", k2[128] = "year";
+            char k1[128] = "x", k2[128] = "y";
             query_get_group_keys(q, k1, k2, sizeof(k1));
             est->instancia = lista_gen_criar(k1, k2);
             break;
         }
         case EST_LISTA_CRUZ: {
-            char k1[128] = "threat_category", k2[128] = "year";
+            char k1[128] = "x", k2[128] = "y";
             query_get_cross_keys(q, k1, k2, sizeof(k1));
             est->instancia = lista_cruz_criar(k1, k2);
             break;
@@ -86,12 +90,15 @@ Estrutura* estrutura_criar(const char *nome, const Query *q) {
         return NULL;
     }
 
+    // Retorna a estrutura ao usuário
     return est;
 }
 
+// Insere item na estrutura
 bool estrutura_inserir(Estrutura *est, ITEM *item) {
-    if (!est || !est->instancia || !item) return false;
+    if (!est || !est->instancia || !item) return false; // o ponteiro de estrutura e item são validados
 
+    // utiliza o insere de acordo com a estrutra usada no momento
     switch (est->tipo) {
         case EST_PILHA:
             return pilha_empilhar((PILHA *) est->instancia, item);
@@ -114,9 +121,11 @@ bool estrutura_inserir(Estrutura *est, ITEM *item) {
     }
 }
 
+// Retorna o tamanho
 int estrutura_tamanho(const Estrutura *est) {
     if (!est || !est->instancia) return 0;
 
+    // Pega o tamanho de acordo com a estrutura utilizada
     switch (est->tipo) {
         case EST_PILHA:
             return pilha_tamanho((PILHA *) est->instancia);
@@ -139,9 +148,12 @@ int estrutura_tamanho(const Estrutura *est) {
     }
 }
 
+// Percorre a estrutura
 void estrutura_percorrer(const Estrutura *est, void (*callback)(ITEM *item, void *dados_extras), void *dados_extras) {
     if (!est || !est->instancia || !callback) return;
 
+    // Percorre a estrutura de acordo com o seu tipo, utiliza o callback para
+    //  percorrer de forma genérica: serve para printar ou salvar dados em arquivo
     switch (est->tipo) {
         case EST_PILHA:
             pilha_percorrer((PILHA *) est->instancia, callback, dados_extras);
@@ -172,19 +184,22 @@ void estrutura_percorrer(const Estrutura *est, void (*callback)(ITEM *item, void
     }
 }
 
+// Estrutura de exportar para o arquivo
 typedef struct {
     FILE *out;
     int max_k;
     int count;
 } ExportContext;
 
+// Função callback é acionada a cada item percorrido da estrutura de dados
 static void exportar_callback(ITEM *item, void *dados) {
-    ExportContext *ctx = (ExportContext *) dados;
-    if (ctx->max_k > 0 && ctx->count >= ctx->max_k) return;
-    item_escrever_csv(ctx->out, item);
+    ExportContext *ctx = (ExportContext *) dados;   // Envia de volta para a estrutura de dados
+    if (ctx->max_k > 0 && ctx->count >= ctx->max_k) return; // Se chegou ao k, encerra
+    item_escrever_csv(ctx->out, item);  // Escreve o item n de k no CSV
     ctx->count++;
 }
 
+// Função principal de escrever o arquivo de saida
 int estrutura_exportar_top_k(Estrutura *est, FILE *arquivo_saida, int top_k) {
     if (!est || !est->instancia || !arquivo_saida) return 0;
 
@@ -193,7 +208,7 @@ int estrutura_exportar_top_k(Estrutura *est, FILE *arquivo_saida, int top_k) {
     ctx.max_k = top_k;
     ctx.count = 0;
 
-    /* Para pilha e fila, podemos remover conforme a regra de acesso do TAD */
+    // Para pilha e fila, podemos remover conforme a regra de acesso do TAD
     if (est->tipo == EST_PILHA) {
         PILHA *p = (PILHA *) est->instancia;
         while (!pilha_vazia(p) && (top_k == 0 || ctx.count < top_k)) {
@@ -219,9 +234,11 @@ int estrutura_exportar_top_k(Estrutura *est, FILE *arquivo_saida, int top_k) {
     return ctx.count;
 }
 
+// Destrutor
 void estrutura_apagar(Estrutura **est) {
-    if (!est || !*est) return;
+    if (!est || !*est) return;  // Valida a estrutura
 
+    // Apenas chama o destrutor específico do tipo de estrutura
     Estrutura *e = *est;
     if (e->instancia) {
         switch (e->tipo) {
@@ -275,6 +292,7 @@ void estrutura_apagar(Estrutura **est) {
     *est = NULL;
 }
 
+// Retorna o nome da estrutura
 const char* estrutura_nome(const Estrutura *est) {
     return est ? est->nome : "desconhecida";
 }

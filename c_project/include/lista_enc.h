@@ -14,4 +14,4 @@ int lista_enc_tamanho(const ListaEnc *lista);
 bool lista_enc_vazia(const ListaEnc *lista);
 void lista_enc_percorrer(const ListaEnc *lista, void (*callback)(ITEM *item, void *dados_extras), void *dados_extras);
 
-#endif /* LISTA_ENC_H */
+#endif

@@ -13,4 +13,4 @@ int lista_gen_tamanho(const ListaGen *lista);
 bool lista_gen_vazia(const ListaGen *lista);
 void lista_gen_percorrer(const ListaGen *lista, void (*callback)(ITEM *item, void *dados_extras), void *dados_extras);
 
-#endif /* LISTA_GEN_H */
+#endif

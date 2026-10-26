@@ -52,4 +52,4 @@ double item_get_similarity(const ITEM *item);
 void item_escrever_csv(FILE *file, const ITEM *item);
 ITEM** read_csv_to_items(const char *filename, int *out_num_rows);
 
-#endif /* GENERIC_ITEM_H */
+#endif

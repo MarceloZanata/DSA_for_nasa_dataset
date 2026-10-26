@@ -15,4 +15,4 @@ struct reader_t {
 Reader* reader_obter(const char *nome);
 void reader_liberar(Reader *r);
 
-#endif /* READER_H */
+#endif

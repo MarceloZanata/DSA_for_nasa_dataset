@@ -28,4 +28,4 @@ int estrutura_exportar_top_k(Estrutura *est, FILE *arquivo_saida, int top_k);
 void estrutura_apagar(Estrutura **est);
 const char* estrutura_nome(const Estrutura *est);
 
-#endif /* ESTRUTURA_H */
+#endif

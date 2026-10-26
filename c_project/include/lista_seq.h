@@ -14,4 +14,4 @@ int lista_seq_tamanho(const ListaSeq *lista);
 bool lista_seq_vazia(const ListaSeq *lista);
 void lista_seq_percorrer(const ListaSeq *lista, void (*callback)(ITEM *item, void *dados_extras), void *dados_extras);
 
-#endif /* LISTA_SEQ_H */
+#endif

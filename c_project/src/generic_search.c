@@ -7,7 +7,7 @@
 #include "generic_item.h"
 #include "generic_search.h"
 
-#define SIM_EPS 1e-9   /* tolerancia para comparar similaridade com o limiar */
+#define SIM_EPS 1e-9   // tolerancia para comparar similaridade com o limiar
 
 typedef enum { OP_EQ, OP_NE, OP_LE, OP_GE, OP_LT, OP_GT } CmpOp;
 

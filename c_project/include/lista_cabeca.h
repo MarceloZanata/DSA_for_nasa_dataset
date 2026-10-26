@@ -14,4 +14,4 @@ int lista_cabeca_tamanho(const ListaCabeca *lista);
 bool lista_cabeca_vazia(const ListaCabeca *lista);
 void lista_cabeca_percorrer(const ListaCabeca *lista, void (*callback)(ITEM *item, void *dados_extras), void *dados_extras);
 
-#endif /* LISTA_CABECA_H */
+#endif
