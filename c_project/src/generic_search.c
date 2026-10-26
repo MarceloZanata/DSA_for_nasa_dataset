@@ -11,23 +11,26 @@
 
 typedef enum { OP_EQ, OP_NE, OP_LE, OP_GE, OP_LT, OP_GT } CmpOp;
 
+// Estrutura das regras do filtro
 typedef struct {
     char *col;
     CmpOp op;
-    char *target;       /* texto original do alvo (comparacao de strings) */
-    double num;         /* alvo interpretado como numero */
+    char *target;       // texto original do alvo (comparacao de strings)
+    double num;         // alvo interpretado como numero
     bool is_num;
-    bool b;             /* alvo interpretado como booleano */
+    bool b;             // alvo interpretado como booleano
     bool is_bool;
 } FilterRule;
 
+// Estrutura da regra do SIM
 typedef struct {
     char *col;
     double target;
-    double tolerance;   /* > 0 */
-    double weight;      /* >= 0 */
+    double tolerance;   // > 0
+    double weight;      // >= 0
 } SimRule;
 
+// Estrutura da consulta
 struct query_ {
     FilterRule *filters;
     int filter_count, filter_cap;
@@ -41,16 +44,18 @@ struct query_ {
     char *cross1, *cross2;
 };
 
-/* ------------------------------------------------------------------ */
-/* Utilitarios                                                         */
-/* ------------------------------------------------------------------ */
+// -----------------------------------------------/
+// Utilitarios                                    /
+// -----------------------------------------------/
 
+// Realloc com saida para o usuário
 static void *xrealloc(void *ptr, size_t n) {
     void *p = realloc(ptr, n ? n : 1);
     if (!p) { fprintf(stderr, "erro: sem memoria\n"); exit(EXIT_FAILURE); }
     return p;
 }
 
+// Duplica string
 static char *dup_str(const char *s) {
     size_t n = strlen(s) + 1;
     char *p = (char *) xrealloc(NULL, n);
@@ -58,12 +63,14 @@ static char *dup_str(const char *s) {
     return p;
 }
 
+// Seta string
 static void set_str(char **dst, const char *s) {
     char *copy = s ? dup_str(s) : NULL;
     free(*dst);
     *dst = copy;
 }
 
+// Compara se as letras são as mesmas
 static bool equals_ignore_case(const char *a, const char *b) {
     while (*a && *b) {
         if (tolower((unsigned char)*a) != tolower((unsigned char)*b)) return false;
@@ -72,6 +79,7 @@ static bool equals_ignore_case(const char *a, const char *b) {
     return *a == '\0' && *b == '\0';
 }
 
+// Converte para double
 static bool parse_double(const char *s, double *out) {
     if (!s || *s == '\0') return false;
     char *end = NULL;
@@ -81,9 +89,9 @@ static bool parse_double(const char *s, double *out) {
     return true;
 }
 
-/* ------------------------------------------------------------------ */
-/* Tokenizacao flexivel ('|' ou espacos; aspas duplas protegem espacos) */
-/* ------------------------------------------------------------------ */
+// ------------------------------------------------------------------ /
+// Tokenizacao ('|' ou espacos; aspas duplas protegem espacos)        /
+// ------------------------------------------------------------------ /
 
 static bool is_sep(char c) { return c == '|' || isspace((unsigned char)c); }
 
