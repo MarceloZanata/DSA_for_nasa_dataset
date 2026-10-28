@@ -135,9 +135,9 @@ static bool parse_op(const char *s, CmpOp *op) {
     return true;
 }
 
-/* ------------------------------------------------------------------ */
-/* Construcao da Query                                                 */
-/* ------------------------------------------------------------------ */
+// ----------------------------------------------------/
+// Construcao da Query                                 /
+// ----------------------------------------------------/
 
 static void add_filter(Query *q, const char *col, CmpOp op, const char *target) {
     if (q->filter_count >= q->filter_cap) {
@@ -280,9 +280,9 @@ void query_free(Query *q) {
     free(q);
 }
 
-/* ------------------------------------------------------------------ */
-/* Avaliacao unitaria                                                  */
-/* ------------------------------------------------------------------ */
+// ----------------------------------------------------/
+// Avaliacao unitaria                                  /
+// ----------------------------------------------------/
 
 static bool cmp_int(CmpOp op, int c) {
     switch (op) {
@@ -371,9 +371,9 @@ bool query_avaliar_item(const ITEM *item, const Query *q, double *out_similarity
     return true;
 }
 
-/* ------------------------------------------------------------------ */
-/* Getters de organizacao                                              */
-/* ------------------------------------------------------------------ */
+// --------------------------------------------------------/
+// Getters de organizacao                                  /
+// --------------------------------------------------------/
 
 static void copy_key(char *dst, size_t max_len, const char *src) {
     if (!dst || max_len == 0) return;
