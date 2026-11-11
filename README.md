@@ -132,3 +132,13 @@ WRITE_MS=...           # tempo de escrita do CSV de saída
 - Ao exportar, `pilha` e `fila` são consumidas (os itens são removidos conforme são escritos). As demais estruturas são apenas percorridas.
 - Os tipos das colunas (inteiro, decimal, booleano, texto) são inferidos automaticamente a partir de cada valor do CSV.
 - Arquivos com BOM UTF-8 no início (comuns no Windows) são tratados automaticamente, tanto no CSV quanto na consulta.
+
+## Interface web (apresentação)
+
+```bash
+python3 servidor.py      # no Windows: python servidor.py
+```
+
+Abre `http://127.0.0.1:8000` com filtros, gráficos, tempos do programa e uma "corrida" entre as estruturas.
+O servidor (`servidor.py`, só biblioteca padrão do Python) compila o programa se necessário, monta o arquivo de
+consulta a partir dos filtros, executa `./trabalho` e devolve os resultados para a página (`web/index.html`).

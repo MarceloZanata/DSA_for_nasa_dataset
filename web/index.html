@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mortes violentas na Bahia — explorador de dados</title>
+<style>
+:root{
+  --bg:#f5f4f0; --panel:#ffffff; --ink:#1b1d2a; --muted:#666a7c; --line:#e3e1d9;
+  --hero1:#1c1f3a; --hero2:#3b2f6b; --hero-ink:#f6f4ff;
+  --accent:#5b4bd5; --accent-soft:#ebe8fb; --accent-ink:#ffffff;
+  --y2023:#1f9d8b; --y2024:#5b4bd5; --y2025:#e8743b;
+  --ph1:#1f9d8b; --ph2:#5b4bd5; --ph3:#e0a21a; --ph4:#d9506e;
+  --term-bg:#14162a; --term-ink:#cfd3f5; --warn:#b4540a; --warn-bg:#fff1e3;
+  --shadow:0 1px 2px rgba(20,20,50,.06),0 6px 20px rgba(20,20,50,.05);
+  --r:16px;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1020; --panel:#191b31; --ink:#ecebf7; --muted:#9a9db6; --line:#2b2e4a;
+    --hero1:#161834; --hero2:#2c2358; --accent:#8a7dff; --accent-soft:#2a2750; --accent-ink:#0f1020;
+    --y2023:#3cc7b3; --y2024:#8a7dff; --y2025:#ff9560;
+    --ph1:#3cc7b3; --ph2:#8a7dff; --ph3:#f2bd45; --ph4:#ff7a98;
+    --term-bg:#0a0b17; --warn:#ffb36b; --warn-bg:#3a2a18; --shadow:none;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+h1,h2,h3{line-height:1.15;margin:0}
+button,select,input{font:inherit;color:inherit}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+/* ---------- hero ---------- */
+.hero{background:linear-gradient(120deg,var(--hero1),var(--hero2));color:var(--hero-ink);padding:44px 24px 84px;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-80px;top:-80px;width:360px;height:360px;border-radius:50%;
+  background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.14),transparent 65%)}
+.wrap{max-width:1280px;margin:0 auto;position:relative;z-index:1}
+.eyebrow{font-size:13px;letter-spacing:.14em;text-transform:uppercase;opacity:.75;font-weight:600}
+.hero h1{font-size:clamp(30px,5vw,52px);font-weight:800;margin:10px 0 12px;letter-spacing:-.02em;max-width:18ch}
+.hero p{max-width:62ch;margin:0;opacity:.88;font-size:17px}
+.hero .note{margin-top:16px;font-size:14px;opacity:.7;max-width:70ch;border-left:3px solid rgba(255,255,255,.35);padding-left:12px}
+
+/* ---------- layout ---------- */
+.layout{max-width:1280px;margin:-52px auto 60px;padding:0 24px;display:grid;grid-template-columns:330px 1fr;gap:24px;align-items:start;position:relative;z-index:2}
+@media (max-width:980px){.layout{grid-template-columns:1fr;padding:0 16px}.hero{padding:32px 16px 76px}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:20px}
+.sidebar{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto}
+@media (max-width:980px){.sidebar{position:static;max-height:none}}
+.sidebar h2{font-size:18px;margin-bottom:4px}
+.sidebar .sub{color:var(--muted);font-size:14px;margin:0 0 14px}
+.field{margin:16px 0}
+.field>label,.field>.lab{display:block;font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+select,input[type=text],input[type=number]{width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);min-height:40px}
+select:focus-visible,input:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:6px 12px;cursor:pointer;font-size:14px;min-height:34px}
+.chip[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip.ghost{background:transparent}
+.hint{font-size:13px;color:var(--muted);margin:6px 0 0}
+.warn{background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:8px 10px;font-size:13px;margin-top:8px}
+.sep{border:0;border-top:1px dashed var(--line);margin:18px 0}
+details summary{cursor:pointer;font-weight:700;font-size:14px;padding:4px 0}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{background:var(--bg);border:0;padding:8px 14px;cursor:pointer;min-height:38px}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink)}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:9px 14px;cursor:pointer;min-height:40px;font-weight:600}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* ---------- main ---------- */
+main{display:flex;flex-direction:column;gap:24px;min-width:0}
+.sec-title{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.sec-title h2{font-size:22px;letter-spacing:-.01em}
+.sec-title p{margin:0;color:var(--muted);font-size:14px}
+.status{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--muted)}
+.dot{width:10px;height:10px;border-radius:50%;background:#2fb26b}
+.dot.busy{background:var(--ph3);animation:pulse 1s infinite}
+.dot.err{background:var(--ph4)}
+@keyframes pulse{50%{opacity:.3}}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;box-shadow:var(--shadow)}
+.kpi .k{font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.kpi .v{font-size:34px;font-weight:800;letter-spacing:-.02em;margin:4px 0 2px;font-variant-numeric:tabular-nums}
+.kpi .v.sm{font-size:24px;padding:6px 0}
+.kpi .d{font-size:13.5px;color:var(--muted)}
+.insight{background:var(--accent-soft);border-radius:12px;padding:12px 16px;font-size:15px;margin-top:14px}
+
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:24px}
+.bars{display:flex;flex-direction:column;gap:9px}
+.bar{display:grid;grid-template-columns:minmax(90px,38%) 1fr auto;gap:10px;align-items:center;font-size:14px}
+.bar .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar .track{height:14px;background:var(--bg);border-radius:7px;overflow:hidden}
+.bar .fill{height:100%;border-radius:7px;background:var(--accent);min-width:2px;transition:width .5s cubic-bezier(.2,.8,.2,1)}
+.bar .num{font-variant-numeric:tabular-nums;font-weight:700;min-width:3ch;text-align:right}
+.bar .pct{color:var(--muted);font-weight:500;font-size:12.5px;margin-left:6px}
+.years{display:flex;gap:18px;align-items:flex-end;height:190px;padding:0 6px}
+.ycol{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:6px}
+.ycol .b{width:100%;max-width:90px;border-radius:10px 10px 4px 4px;transition:height .5s cubic-bezier(.2,.8,.2,1)}
+.ycol .n{font-weight:800;font-variant-numeric:tabular-nums}
+.ycol .y{color:var(--muted);font-size:14px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:14px;margin-bottom:6px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+svg text{fill:var(--muted);font-size:11px}
+svg .grid{stroke:var(--line)}
+
+/* tempos */
+.term{background:var(--term-bg);color:var(--term-ink);border-radius:12px;padding:14px 16px;font-size:13px;line-height:1.55;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+.term b{color:#ffd479;font-weight:600}
+.term .c{opacity:.55}
+.stack{display:flex;height:34px;border-radius:10px;overflow:hidden;background:var(--bg);margin:12px 0 4px}
+.stack div{min-width:2px;transition:width .5s}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:14px}
+.step{border:1px solid var(--line);border-top-width:4px;border-radius:12px;padding:12px 14px}
+.step .t{font-size:12.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.step .ms{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums}
+.step .ms small{font-size:14px;font-weight:600;color:var(--muted)}
+.step p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.total{display:flex;gap:24px;flex-wrap:wrap;align-items:baseline;margin-top:6px}
+.total b{font-size:15px}
+
+/* corrida */
+.race{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.rrow{display:grid;grid-template-columns:150px 1fr 86px;gap:10px;align-items:center;font-size:14px}
+@media (max-width:560px){.rrow{grid-template-columns:96px 1fr 70px}}
+.rrow .rt{display:flex;height:22px;border-radius:6px;overflow:hidden;background:var(--bg)}
+.rrow .rt div{min-width:0;transition:width .5s}
+.rrow .rv{font-variant-numeric:tabular-nums;font-weight:700;text-align:right}
+.rrow.sel .rn{font-weight:800;color:var(--accent)}
+
+/* estruturas */
+.ecards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.ecard{border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.ecard .role{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--accent)}
+.ecard h3{font-size:19px;margin:2px 0 4px}
+.ecard p{margin:4px 0;font-size:14px;color:var(--muted)}
+.ecard svg{width:100%;height:auto;margin-top:6px;background:var(--bg);border-radius:10px}
+.ecard svg .box{fill:var(--panel);stroke:var(--muted);stroke-width:1.4}
+.ecard svg .hl{fill:var(--accent);stroke:var(--accent)}
+.ecard svg .hl2{fill:var(--ph3);stroke:var(--ph3)}
+.ecard svg .arr{stroke:var(--muted);stroke-width:1.5;fill:none}
+.ecard svg .ink{fill:var(--ink);font-weight:600}
+.ecard svg .fillin{fill:var(--accent);opacity:.8}
+
+/* tabela */
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th{text-align:left;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px;border-bottom:2px solid var(--line);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+td.pos{color:var(--muted);width:44px}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12.5px;background:var(--accent-soft)}
+.pager{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+footer{max-width:1280px;margin:0 auto 40px;padding:0 24px;color:var(--muted);font-size:13.5px}
+#tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);padding:6px 10px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .1s;z-index:50;max-width:260px}
+.sr{position:absolute;left:-9999px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div id="tip" role="tooltip"></div>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Projeto de Estruturas de Dados · Bahia 2023–2025</div>
+    <h1>Mortes violentas na Bahia, em números</h1>
+    <p>Esta página usa um programa escrito em <b>C</b> para ler a planilha de ocorrências, filtrar os dados e guardá-los em diferentes estruturas (pilha, fila, listas…). Mexa nos filtros e veja os gráficos — e também <b>quanto tempo</b> o programa levou em cada etapa.</p>
+    <p class="note">Cada linha da planilha é o total de vítimas de um município em um mês. Por trás de cada número existe uma pessoa e uma família: use os dados para entender o problema, não para estigmatizar lugares.</p>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- ================= FILTROS ================= -->
+  <aside class="card sidebar" aria-label="Filtros">
+    <h2>Filtros</h2>
+    <p class="sub">Tudo que você muda aqui vira uma <i>consulta</i> para o programa em C.</p>
+
+    <div class="field"><span class="lab">Experimente</span>
+      <div class="chips" id="presets">
+        <button class="chip ghost" data-p="fem">Feminicídio</button>
+        <button class="chip ghost" data-p="ssa">Só Salvador</button>
+        <button class="chip ghost" data-p="y25">Só 2025</button>
+        <button class="chip ghost" data-p="grave">Meses graves (≥ 10)</button>
+      </div>
+    </div>
+    <hr class="sep">
+
+    <div class="field"><span class="lab">Região</span><div class="chips" id="f-regiao"></div></div>
+    <div class="field"><span class="lab">Período</span>
+      <div class="row2">
+        <label><span class="sr">Ano inicial</span><select id="f-ano-de"></select></label>
+        <label><span class="sr">Ano final</span><select id="f-ano-ate"></select></label>
+        <label><span class="sr">Mês inicial</span><select id="f-mes-de"></select></label>
+        <label><span class="sr">Mês final</span><select id="f-mes-ate"></select></label>
+      </div>
+      <div class="warn" id="w-periodo" hidden>O início do período está depois do fim — nada será encontrado.</div>
+    </div>
+    <div class="field"><span class="lab">Tipo de crime</span><div class="chips" id="f-natureza"></div></div>
+    <div class="field"><label for="f-mun">Município</label>
+      <input type="text" id="f-mun" list="lista-mun" placeholder="Todos (digite para buscar)" autocomplete="off">
+      <datalist id="lista-mun"></datalist>
+      <p class="hint">O nome precisa ser igual ao da planilha (escolha na lista).</p>
+    </div>
+    <div class="field"><label for="f-min">Mínimo de vítimas no registro: <b id="v-min">0</b></label>
+      <input type="range" id="f-min" min="0" max="40" value="0">
+    </div>
+
+    <hr class="sep">
+    <div class="field"><label for="f-base">Estrutura base (carrega o CSV)</label><select id="f-base"></select></div>
+    <div class="field"><label for="f-res">Estrutura de resultado</label><select id="f-res"></select></div>
+
+    <div class="field"><span class="lab">Ordenar resultado</span>
+      <div class="row2">
+        <select id="f-ord" aria-label="Ordenar por"></select>
+        <div class="seg" role="group" aria-label="Direção">
+          <button id="d-desc" aria-pressed="true">Maior ↓</button><button id="d-asc" aria-pressed="false">Menor ↑</button>
+        </div>
+      </div>
+      <div class="hint" id="h-ord">Só a <b>lista ordenada</b> usa a ordenação.</div>
+    </div>
+
+    <div class="field" id="box-grupo" hidden><span class="lab">Agrupar por (lista generalizada / cruzada)</span>
+      <div class="row2"><select id="f-g1" aria-label="Primeiro eixo"></select><select id="f-g2" aria-label="Segundo eixo"></select></div>
+    </div>
+
+    <div class="row2">
+      <div class="field"><label for="f-topk">Linhas na tabela</label>
+        <select id="f-topk"><option value="10">10</option><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option><option value="0">Todas</option></select></div>
+      <div class="field"><label for="f-limit">Ler do CSV</label>
+        <select id="f-limit"><option value="0" selected>Tudo</option><option value="1000">1.000 linhas</option><option value="2500">2.500 linhas</option></select></div>
+    </div>
+
+    <details class="field"><summary>Busca por similaridade (avançado)</summary>
+      <label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="s-on"> Ativar</label>
+      <div id="s-box" hidden>
+        <p class="hint">Dá uma nota de 0 a 1 para cada registro: quanto mais perto do <b>alvo</b>, maior. Se estiver além da <b>tolerância</b>, a nota é 0.</p>
+        <div class="row2" style="margin-top:8px">
+          <label><span class="lab">Coluna</span><select id="s-col"><option value="QT_VITIMAS">Vítimas</option><option value="MES">Mês</option><option value="ANO">Ano</option></select></label>
+          <label><span class="lab">Alvo</span><input type="number" id="s-alvo" value="5" step="1"></label>
+          <label><span class="lab">Tolerância</span><input type="number" id="s-tol" value="5" min="0.1" step="0.5"></label>
+          <label><span class="lab">Nota mínima</span><input type="number" id="s-lim" value="0.5" min="0" max="1" step="0.1"></label>
+        </div>
+      </div>
+    </details>
+
+    <hr class="sep">
+    <button class="btn" id="reset" style="width:100%">Limpar todos os filtros</button>
+  </aside>
+
+  <!-- ================= CONTEÚDO ================= -->
+  <main>
+    <section class="card" aria-labelledby="t-res">
+      <div class="sec-title"><h2 id="t-res">Resumo do que foi encontrado</h2>
+        <div class="status"><span class="dot busy" id="dot"></span><span id="status">Carregando…</span></div></div>
+      <div class="kpis" id="kpis"></div>
+      <div class="insight" id="insight" hidden></div>
+    </section>
+
+    <section class="card" aria-labelledby="t-tempo">
+      <div class="sec-title"><h2 id="t-tempo">⏱ Tempos medidos pelo programa em C</h2>
+        <p>Cada número abaixo é impresso pelo seu <span class="mono">./trabalho</span></p></div>
+      <div class="term mono" id="term"></div>
+      <div class="stack" id="stack" aria-hidden="true"></div>
+      <div class="total" id="total"></div>
+      <div class="steps" id="steps"></div>
+    </section>
+
+    <section class="card" aria-labelledby="t-graf">
+      <div class="sec-title"><h2 id="t-graf">Gráficos</h2><p>Calculados sobre <b>todos</b> os registros encontrados</p></div>
+      <div class="grid2">
+        <div style="grid-column:1/-1">
+          <h3 style="font-size:16px">Vítimas mês a mês</h3>
+          <div class="legend" id="leg-mes"></div>
+          <div id="ch-mes"></div>
+        </div>
+        <div><h3 style="font-size:16px;margin-bottom:12px">Vítimas por ano</h3><div class="years" id="ch-ano"></div></div>
+        <div><h3 style="font-size:16px;margin-bottom:12px">Por tipo de crime</h3><div class="bars" id="ch-nat"></div></div>
+        <div><h3 style="font-size:16px;margin-bottom:12px">Por região</h3><div class="bars" id="ch-reg"></div></div>
+        <div><h3 style="font-size:16px;margin-bottom:12px">10 municípios com mais vítimas</h3><div class="bars" id="ch-mun"></div></div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="t-race">
+      <div class="sec-title"><h2 id="t-race">🏁 Corrida das estruturas de dados</h2>
+        <p>Mesma consulta, cada estrutura no seu papel · mediana de 3 execuções</p></div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+        <button class="btn primary" id="go-race">Rodar a corrida</button>
+        <div class="seg" id="race-tabs" hidden role="group" aria-label="Papel da estrutura">
+          <button data-m="como_base" aria-pressed="true">Como base</button><button data-m="como_resultado" aria-pressed="false">Como resultado</button>
+        </div>
+        <span class="hint" id="race-hint" style="margin:0">Roda o programa 48 vezes (8 estruturas × 2 papéis × 3). Leva alguns segundos.</span>
+      </div>
+      <div class="legend" id="race-leg" style="margin-top:14px" hidden></div>
+      <div class="race" id="race"></div>
+      <div class="insight" id="race-insight" hidden></div>
+    </section>
+
+    <section class="card" aria-labelledby="t-est">
+      <div class="sec-title"><h2 id="t-est">🧱 As estruturas que você escolheu</h2><p>Desenhos esquemáticos</p></div>
+      <div class="ecards" id="ecards"></div>
+    </section>
+
+    <section class="card" aria-labelledby="t-tab">
+      <div class="sec-title"><h2 id="t-tab">Registros devolvidos pelo programa</h2>
+        <button class="btn" id="dl">Baixar CSV</button></div>
+      <p class="hint" style="margin:-6px 0 10px" id="tab-hint"></p>
+      <div class="tablewrap"><table id="tabela"></table></div>
+      <div class="pager"><span id="pg-info"></span><span><button class="btn" id="pg-prev">← Anterior</button> <button class="btn" id="pg-next">Próxima →</button></span></div>
+    </section>
+  </main>
+</div>
+<footer>Os dados são lidos de <span class="mono">dados/mortes.csv</span> exclusivamente pelo programa em C; o servidor Python (<span class="mono">servidor.py</span>) só monta a consulta e repassa os resultados para esta página.</footer>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+const MESES_L = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+const YCOL = {2023:"var(--y2023)",2024:"var(--y2024)",2025:"var(--y2025)"};
+const fmt = n => Math.round(n).toLocaleString("pt-BR");
+const fms = n => n < 10 ? n.toFixed(2).replace(".",",") : n < 100 ? n.toFixed(1).replace(".",",") : fmt(n);
+const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase();
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const NAT_LABEL = {
+  "HOMICIDIO DOLOSO":"Homicídio doloso","FEMINICIDIO":"Feminicídio",
+  "LESAO CORPORAL SEGUIDA DE MORTE":"Lesão corporal seguida de morte",
+  "ROUBO COM RESULTADO MORTE - (LATROCINIO)":"Latrocínio (roubo com morte)",
+  "HOMICIDIO DOLOSO COM INDICIO DE EXCLUDENTE DE ILICITUDE":"Homicídio com indício de excludente",
+  "HOMICIDIO OCORRIDO EM PRESIDIO":"Homicídio em presídio"};
+const natLabel = n => NAT_LABEL[norm(n)] || n;
+const REG_LABEL = {Interior:"Interior",RMS:"RMS (entorno de Salvador)",Salvador:"Salvador"};
+
+const ESTR = {
+  pilha:{ex:"Funciona como uma pilha de pratos: o último que você coloca é o primeiro que sai (LIFO). Ao escrever o CSV, a pilha é esvaziada.",
+    nota:"Resultado sai em ordem inversa à da busca."},
+  fila:{ex:"Funciona como a fila do mercado: o primeiro que chega é o primeiro atendido (FIFO). Ao escrever o CSV, a fila é esvaziada.",
+    nota:"Resultado sai na mesma ordem em que foi encontrado."},
+  lista_seq:{ex:"Itens lado a lado num vetor. Acessar uma posição é instantâneo; quando o vetor enche, ele precisa crescer.",nota:"Bom para acessar por posição."},
+  lista_enc:{ex:"Cada nó guarda o dado e o endereço do próximo. Não precisa de espaço contíguo e é fácil inserir.",nota:"Para chegar ao 50º item é preciso passar pelos 49 anteriores."},
+  lista_cabeca:{ex:"Lista encadeada com um nó cabeça fixo no início: ele não guarda dado, só simplifica inserir e remover no começo.",nota:"Mesma ideia da encadeada, com código mais simples."},
+  lista_ord:{ex:"Mantém os itens sempre ordenados pela coluna do ORDER. Cada novo item é colocado na posição certa.",nota:"Para achar a posição certa ela precisa percorrer a lista — por isso inserir muitos itens costuma ser mais lento."},
+  lista_gen:{ex:"Organiza os registros em grupos e subgrupos (ex.: tipo de crime → região), como pastas dentro de pastas.",nota:"Bom para consultar por grupo; a carga custa mais porque cada item precisa achar seu grupo."},
+  lista_cruz:{ex:"Uma tabela de dois eixos (ex.: tipo de crime × região) em que só as células com dados existem.",nota:"Ideal para cruzar duas categorias."}
+};
+
+/* ---------- desenhos ---------- */
+function diagram(id){
+  const T=(x,y,t,c="")=>`<text x="${x}" y="${y}" text-anchor="middle" class="${c}">${t}</text>`;
+  const defs=`<defs><marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="var(--muted)"/></marker></defs>`;
+  const A=(x1,y1,x2,y2)=>`<path class="arr" d="M${x1} ${y1}L${x2} ${y2}" marker-end="url(#ah)"/>`;
+  const R=(x,y,w,h,c="box",rx=6)=>`<rect class="${c}" x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}"/>`;
+  let s="";
+  if(id==="pilha"){
+    s=[0,1,2].map(i=>R(90,62-i*26,80,22,i==2?"hl":"box")+T(130,77-i*26,["registro 1","registro 2","registro 3"][i],i==2?"":"ink")).join("")
+     +`<text x="130" y="92" text-anchor="middle">base</text>`
+     +A(212,14,178,22)+T(222,12,"topo")+T(40,30,"push ↓")+T(40,60,"pop ↑");
+    s=s.replace('class="" ','');
+  }else if(id==="fila"){
+    s=[0,1,2,3].map(i=>R(60+i*44,34,40,26,i==0?"hl":"box")+T(80+i*44,51,i+1,i==0?"":"ink")).join("")
+     +A(8,47,56,47)+T(30,30,"entra")+A(240,47,252,47)+T(236,28,"sai")+T(80,78,"frente");
+  }else if(id==="lista_seq"){
+    s=[0,1,2,3,4,5,6].map(i=>`<rect class="${i<5?"box":"box"}" x="${18+i*34}" y="30" width="34" height="28" ${i>=5?'stroke-dasharray="4 3" fill="none"':""}/>${i<5?T(35+i*34,48,i+1,"ink"):""}${T(35+i*34,74,i)}`).join("")
+     +T(130,16,"posições seguidas na memória");
+  }else if(id==="lista_enc"||id==="lista_cabeca"){
+    const cab=id==="lista_cabeca";
+    s=[0,1,2,3].map(i=>{const x=30+i*52;return R(x,30,34,26,cab&&i==0?"hl2":"box")+`<circle cx="${x+27}" cy="43" r="3" fill="var(--muted)"/>`+(i<3?A(x+27,43,x+52,43):"")+T(x+10,47,cab&&i==0?"":i,"ink")}).join("")
+     +A(238,43,254,43)+T(238,30,"NULL")+T(47,78,cab?"cabeça (sem dado)":"início")+T(130,16,"dado + ponteiro para o próximo");
+    s=s.replace(/<text[^>]*>(undefined)?<\/text>/g,"");
+  }else if(id==="lista_ord"){
+    s=[2,5,7,9].map((v,i)=>{const x=16+i*60;return R(x,44,34,26)+T(x+17,61,v,"ink")+(i<3?A(x+36,57,x+58,57):"")}).join("")
+     +R(100,6,34,24,"hl")+T(117,22,"6")+`<path class="arr" stroke-dasharray="3 3" d="M117 32L117 42" marker-end="url(#ah)"/>`
+     +T(200,20,"novo item: entra na")+T(200,32,"posição certa");
+  }else if(id==="lista_gen"){
+    s=R(100,6,60,20,"hl")+T(130,20,"todos")
+     +[[30,"Grupo A"],[130,"Grupo B"],[225,"Grupo C"]].map(([x,t])=>A(130,27,x,42)+R(x-28,42,56,20)+T(x,56,t,"ink")).join("")
+     +[[14],[46],[130],[210],[240]].map(([x])=>`<path class="arr" d="M${x<100?30:x<180?130:225} 63L${x} 76"/>`+R(x-12,76,24,14,"fillin",3)).join("");
+  }else if(id==="lista_cruz"){
+    const pts=new Set(["0,1","1,0","1,2","2,1","3,3","0,3","2,2"]);
+    s=[0,1,2,3].map(r=>[0,1,2,3,4].map(c=>c==0?T(34,28+r*17,["Tipo A","Tipo B","Tipo C","Tipo D"][r]):`<rect class="box" x="${50+(c-1)*42}" y="${16+r*17}" width="40" height="15" rx="3" fill="none"/>${pts.has(r+","+(c-1))?`<circle cx="${70+(c-1)*42}" cy="${23.5+r*17}" r="4.5" class="fillin"/>`:""}`).join("")).join("")
+     +["Reg. 1","Reg. 2","Reg. 3","Reg. 4"].map((t,i)=>T(70+i*42,10,t)).join("");
+  }
+  return `<svg viewBox="0 0 260 96" role="img" aria-label="Desenho da estrutura ${id}">${defs}${s}</svg>`;
+}
+
+/* ---------- estado ---------- */
+let META=null, DATA=null, BASELINE=null, reqId=0, timer=null, page=0, raceData=null, raceMode="como_base";
+const S = {regioes:new Set(), naturezas:new Set(), dir:"DESC"};
+const COL = {};
+
+function opt(sel, items, val){ sel.innerHTML = items.map(([v,t])=>`<option value="${esc(v)}">${esc(t)}</option>`).join(""); if(val!=null) sel.value=val; }
+
+async function init(){
+  META = await (await fetch("/api/meta")).json();
+  META.regioes.forEach(r=>S.regioes.add(r)); META.naturezas.forEach(n=>S.naturezas.add(n));
+  const anos=META.anos.map(a=>[a,a]);
+  opt($("#f-ano-de"),anos,META.anos[0]); opt($("#f-ano-ate"),anos,META.anos.at(-1));
+  opt($("#f-mes-de"),MESES_L.map((m,i)=>[i+1,"de "+m]),1); opt($("#f-mes-ate"),MESES_L.map((m,i)=>[i+1,"até "+m]),12);
+  $("#lista-mun").innerHTML = META.municipios.map(m=>`<option value="${esc(m)}">`).join("");
+  const est=META.estruturas.map(e=>[e.id,e.nome]);
+  opt($("#f-base"),est,"lista_enc"); opt($("#f-res"),est,"lista_ord");
+  const gcols=[["GR_NATUREZA","Tipo de crime"],["REGIAO","Região"],["ANO","Ano"],["MES","Mês"]];
+  opt($("#f-g1"),gcols,"GR_NATUREZA"); opt($("#f-g2"),gcols,"REGIAO");
+  buildChips(); syncOrder();
+  wire();
+  await run(true);
+}
+
+function buildChips(){
+  const mk=(box,items,set,label)=>{
+    box.innerHTML=items.map(v=>`<button class="chip" data-v="${esc(v)}" aria-pressed="${set.has(v)}">${esc(label(v))}</button>`).join("");
+  };
+  mk($("#f-regiao"),META.regioes,S.regioes,r=>REG_LABEL[r]||r);
+  mk($("#f-natureza"),META.naturezas,S.naturezas,natLabel);
+}
+
+function syncOrder(){
+  const simOn=$("#s-on").checked, cur=$("#f-ord").value;
+  const o=[["QT_VITIMAS","Número de vítimas"],["ANO","Ano"],["MES","Mês"],["MUNICIPIO","Município (A–Z)"],["REGIAO","Região"],["GR_NATUREZA","Tipo de crime"]];
+  if(simOn) o.push(["similarity","Nota de similaridade"]);
+  opt($("#f-ord"),o,o.some(x=>x[0]===cur)?cur:"QT_VITIMAS");
+  const isOrd=$("#f-res").value==="lista_ord";
+  $("#f-ord").disabled=!isOrd; $("#d-desc").disabled=$("#d-asc").disabled=!isOrd;
+  $("#h-ord").innerHTML=isOrd?"A <b>lista ordenada</b> insere cada item já na posição certa.":"Só a <b>lista ordenada</b> usa a ordenação. Troque o resultado para ela para ver o efeito.";
+  const g=["lista_gen","lista_cruz"];
+  $("#box-grupo").hidden=!(g.includes($("#f-base").value)||g.includes($("#f-res").value));
+}
+
+function config(){
+  const mun=$("#f-mun").value.trim();
+  const validMun = META.municipios.includes(mun) ? mun : "";
+  const c={
+    base:$("#f-base").value, resultado:$("#f-res").value, top_k:+$("#f-topk").value, limit:+$("#f-limit").value,
+    ano_de:+$("#f-ano-de").value, ano_ate:+$("#f-ano-ate").value, mes_de:+$("#f-mes-de").value, mes_ate:+$("#f-mes-ate").value,
+    min_vitimas:+$("#f-min").value||"",
+    regioes_excluidas:META.regioes.filter(r=>!S.regioes.has(r)),
+    naturezas_excluidas:META.naturezas.filter(n=>!S.naturezas.has(n)),
+    municipio:validMun,
+    grupo1:$("#f-g1").value, grupo2:$("#f-g2").value,
+    sim:{ativo:$("#s-on").checked,coluna:$("#s-col").value,alvo:+$("#s-alvo").value,tolerancia:+$("#s-tol").value,peso:1,limiar:+$("#s-lim").value}
+  };
+  if(c.resultado==="lista_ord"){ c.ordem_coluna=$("#f-ord").value; c.ordem_dir=S.dir; }
+  return c;
+}
+
+function wire(){
+  document.addEventListener("mouseover",e=>{const t=e.target.closest("[data-tip]"); if(!t){$("#tip").style.opacity=0;return;} const tip=$("#tip"); tip.textContent=t.dataset.tip; tip.style.opacity=1;});
+  document.addEventListener("mousemove",e=>{const tip=$("#tip"); tip.style.left=Math.min(e.clientX+14,innerWidth-270)+"px"; tip.style.top=(e.clientY+16)+"px";});
+  const sched=()=>{ clearTimeout(timer); timer=setTimeout(()=>run(false),260); };
+  $("#f-regiao").onclick=e=>{const b=e.target.closest(".chip"); if(!b)return; toggle(S.regioes,b); sched();};
+  $("#f-natureza").onclick=e=>{const b=e.target.closest(".chip"); if(!b)return; toggle(S.naturezas,b); sched();};
+  const toggle=(set,b)=>{const v=b.dataset.v; set.has(v)?set.delete(v):set.add(v); b.setAttribute("aria-pressed",set.has(v));};
+  ["#f-ano-de","#f-ano-ate","#f-mes-de","#f-mes-ate","#f-mun","#f-topk","#f-limit","#f-g1","#f-g2","#s-col","#s-alvo","#s-tol","#s-lim","#f-ord"].forEach(s=>$(s).addEventListener("input",()=>{checkPeriodo();sched();}));
+  $("#f-min").addEventListener("input",()=>{$("#v-min").textContent=$("#f-min").value;sched();});
+  ["#f-base","#f-res"].forEach(s=>$(s).addEventListener("input",()=>{syncOrder();sched();}));
+  $("#s-on").addEventListener("input",()=>{$("#s-box").hidden=!$("#s-on").checked;syncOrder();sched();});
+  $("#d-desc").onclick=()=>{S.dir="DESC";dirUI();sched();}; $("#d-asc").onclick=()=>{S.dir="ASC";dirUI();sched();};
+  $("#reset").onclick=resetAll;
+  $("#presets").onclick=e=>{const b=e.target.closest("[data-p]"); if(b) preset(b.dataset.p);};
+  $("#pg-prev").onclick=()=>{page=Math.max(0,page-1);renderTable();}; $("#pg-next").onclick=()=>{page++;renderTable();};
+  $("#dl").onclick=download;
+  $("#go-race").onclick=race;
+  $("#race-tabs").onclick=e=>{const b=e.target.closest("button"); if(!b)return; raceMode=b.dataset.m; [...$("#race-tabs").children].forEach(x=>x.setAttribute("aria-pressed",x===b)); renderRace();};
+}
+function dirUI(){ $("#d-desc").setAttribute("aria-pressed",S.dir==="DESC"); $("#d-asc").setAttribute("aria-pressed",S.dir==="ASC"); }
+function checkPeriodo(){ $("#w-periodo").hidden = !(+$("#f-ano-de").value>+$("#f-ano-ate").value || +$("#f-mes-de").value>+$("#f-mes-ate").value); }
+function resetAll(){
+  META.regioes.forEach(r=>S.regioes.add(r)); META.naturezas.forEach(n=>S.naturezas.add(n)); buildChips();
+  $("#f-ano-de").value=META.anos[0]; $("#f-ano-ate").value=META.anos.at(-1); $("#f-mes-de").value=1; $("#f-mes-ate").value=12;
+  $("#f-mun").value=""; $("#f-min").value=0; $("#v-min").textContent=0; $("#s-on").checked=false; $("#s-box").hidden=true;
+  syncOrder(); checkPeriodo(); run(false);
+}
+function preset(p){
+  resetAll();
+  if(p==="fem"){ S.naturezas.clear(); S.naturezas.add(META.naturezas.find(n=>norm(n)==="FEMINICIDIO")); }
+  if(p==="ssa"){ S.regioes.clear(); S.regioes.add("Salvador"); }
+  if(p==="y25"){ $("#f-ano-de").value=$("#f-ano-ate").value=2025; }
+  if(p==="grave"){ $("#f-min").value=10; $("#v-min").textContent=10; }
+  buildChips(); run(false);
+}
+
+/* ---------- execução ---------- */
+async function post(url,body,signal){
+  const r=await fetch(url,{method:"POST",body:JSON.stringify(body),signal});
+  const j=await r.json(); if(!r.ok) throw new Error(j.erro||"erro"); return j;
+}
+async function run(first){
+  const id=++reqId; setStatus("busy","Executando o programa em C…");
+  const t0=performance.now();
+  try{
+    let cfg=config();
+    if(first){ BASELINE=analyze(await post("/api/run",{...cfg,top_k:0,limit:0,ano_de:"",ano_ate:"",mes_de:"",mes_ate:"",min_vitimas:"",regioes_excluidas:[],naturezas_excluidas:[],municipio:"",sim:{ativo:false}})); }
+    const d=await post("/api/run",cfg);
+    if(id!==reqId) return;
+    d.rtt=performance.now()-t0; DATA=d; DATA.A=analyze(d); page=0;
+    setStatus("ok",`Pronto · resposta em ${fmt(d.rtt)} ms`); render();
+  }catch(e){ if(id===reqId) setStatus("err","Erro: "+e.message); }
+}
+function setStatus(k,t){ $("#dot").className="dot "+(k==="busy"?"busy":k==="err"?"err":""); $("#status").textContent=t; }
+
+function analyze(d){
+  const c=Object.fromEntries(d.colunas.map((n,i)=>[n,i]));
+  const A={n:d.todos.length,sum:0,mes:{},ano:{},nat:{},reg:{},mun:{}};
+  for(const r of d.todos){
+    const q=+r[c.QT_VITIMAS], y=+r[c.ANO], m=+r[c.MES];
+    A.sum+=q; A.ano[y]=(A.ano[y]||0)+q; (A.mes[y]??=Array(12).fill(0))[m-1]+=q;
+    A.nat[r[c.GR_NATUREZA]]=(A.nat[r[c.GR_NATUREZA]]||0)+q; A.reg[r[c.REGIAO]]=(A.reg[r[c.REGIAO]]||0)+q;
+    A.mun[r[c.MUNICIPIO]]=(A.mun[r[c.MUNICIPIO]]||0)+q;
+  }
+  A.mesTot=Array(12).fill(0); Object.values(A.mes).forEach(a=>a.forEach((v,i)=>A.mesTot[i]+=v));
+  return A;
+}
+const topN=(o,k=1)=>Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,k);
+
+/* ---------- render ---------- */
+function render(){ renderKpis(); renderTempos(); renderCharts(); renderEstruturas(); renderTable(); if(raceData) renderRace(); }
+
+function renderKpis(){
+  const A=DATA.A,s=DATA.stats,B=BASELINE;
+  const share=B.sum?A.sum/B.sum*100:0;
+  const tm=topN(A.mun)[0], mm=A.mesTot.indexOf(Math.max(...A.mesTot));
+  $("#kpis").innerHTML=`
+   <div class="kpi"><div class="k">Vítimas</div><div class="v">${fmt(A.sum)}</div><div class="d">${share.toFixed(share<10?1:0).replace(".",",")}% das ${fmt(B.sum)} da base inteira</div></div>
+   <div class="kpi"><div class="k">Registros encontrados</div><div class="v">${fmt(s.MATCHED_RECORDS)}</div><div class="d">de ${fmt(s.INPUT_RECORDS)} lidos do CSV</div></div>
+   <div class="kpi"><div class="k">Município mais afetado</div><div class="v sm">${tm?esc(tm[0]):"—"}</div><div class="d">${tm?fmt(tm[1])+" vítimas":"nenhum registro"}</div></div>
+   <div class="kpi"><div class="k">Mês mais violento</div><div class="v sm">${A.sum?MESES_L[mm][0].toUpperCase()+MESES_L[mm].slice(1):"—"}</div><div class="d">${A.sum?fmt(A.mesTot[mm])+" vítimas somando os anos":""}</div></div>`;
+  const ins=$("#insight");
+  if(A.n){
+    const media=A.sum/A.n, nat=topN(A.nat)[0], anos=Object.keys(A.ano).sort();
+    let t=`Em média, cada registro (um município em um mês) tem <b>${media.toFixed(1).replace(".",",")}</b> vítima(s). O tipo mais comum é <b>${esc(natLabel(nat[0]))}</b> (${(nat[1]/A.sum*100).toFixed(0)}%).`;
+    if(anos.length>1){ const a=A.ano[anos[0]],b=A.ano[anos.at(-1)]; const v=a?(b-a)/a*100:0;
+      t+=` De ${anos[0]} para ${anos.at(-1)} o total ${v<0?"caiu":"subiu"} <b>${Math.abs(v).toFixed(0)}%</b>.`; }
+    ins.innerHTML=t; ins.hidden=false;
+  } else ins.hidden=true;
+}
+
+function renderTempos(){
+  const s=DATA.stats, ph=[
+    ["Carga","LOAD_MS","var(--ph1)","Lê o CSV linha por linha e guarda cada registro na estrutura base."],
+    ["Busca","SEARCH_MS","var(--ph2)","Testa cada registro contra os filtros da consulta."],
+    ["Inserção do resultado","RESULT_INSERT_MS","var(--ph3)","Guarda quem passou nos filtros na estrutura de resultado."],
+    ["Escrita do CSV","WRITE_MS","var(--ph4)","Grava os primeiros registros no arquivo de saída."]];
+  const tot=ph.reduce((a,p)=>a+s[p[1]],0);
+  const cmd=DATA.comando.replace(/ --/g,' \\\n   --');
+  $("#term").innerHTML=`<span class="c"># consulta enviada (consulta.txt)</span>\n${esc(DATA.consulta.trim()||"(vazia — sem filtros)")}\n\n<span class="c"># comando executado</span>\n<b>${esc(cmd)}</b>\n\n<span class="c"># saída do programa</span>\n`+
+    ["STATUS","INPUT_RECORDS","MATCHED_RECORDS","OUTPUT_RECORDS","LOAD_MS","SEARCH_MS","RESULT_INSERT_MS","WRITE_MS"].map(k=>`${k}=${typeof s[k]==="number"&&k.endsWith("MS")?s[k].toFixed(3):s[k]}`).join("\n");
+  $("#stack").innerHTML=ph.map(p=>`<div style="width:${tot?s[p[1]]/tot*100:25}%;background:${p[2]}" data-tip="${p[0]}: ${fms(s[p[1]])} ms"></div>`).join("");
+  $("#total").innerHTML=`<span><b>Total medido pelo C:</b> <span class="mono">${fms(tot)} ms</span></span><span style="color:var(--muted)">Resposta completa da página: ${fmt(DATA.rtt)} ms <span title="inclui abrir o programa, escrever/ler arquivos e transferir os dados">(inclui iniciar o programa e transferir dados)</span></span>`;
+  $("#steps").innerHTML=ph.map(p=>`<div class="step" style="border-top-color:${p[2]}"><div class="t">${p[0]}</div><div class="ms">${fms(s[p[1]])} <small>ms</small></div><p>${p[3]}</p></div>`).join("");
+}
+
+function renderCharts(){
+  const A=DATA.A;
+  // mês a mês
+  const anos=Object.keys(A.mes).sort(), W=720,H=260,L=40,R=12,Tp=12,B=26;
+  $("#leg-mes").innerHTML=anos.map(y=>`<span><i style="background:${YCOL[y]||"var(--accent)"}"></i>${y}</span>`).join("");
+  if(!anos.length){ $("#ch-mes").innerHTML='<div class="empty">Nenhum registro com esses filtros.</div>'; }
+  else{
+    const mx=Math.max(1,...anos.flatMap(y=>A.mes[y])), step=niceStep(mx/4), top_=Math.ceil(mx/step)*step;
+    const X=i=>L+i*(W-L-R)/11, Y=v=>Tp+(1-v/top_)*(H-Tp-B);
+    let g="";
+    for(let v=0;v<=top_;v+=step) g+=`<line class="grid" x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L-6}" y="${Y(v)+4}" text-anchor="end">${fmt(v)}</text>`;
+    g+=MESES.map((m,i)=>`<text x="${X(i)}" y="${H-8}" text-anchor="middle">${m}</text>`).join("");
+    const lines=anos.map(y=>{const c=YCOL[y]||"var(--accent)",v=A.mes[y];
+      return `<polyline fill="none" stroke="${c}" stroke-width="2.5" stroke-linejoin="round" points="${v.map((q,i)=>X(i)+","+Y(q)).join(" ")}"/>`+
+        v.map((q,i)=>`<circle cx="${X(i)}" cy="${Y(q)}" r="${anos.length>1?3:4}" fill="${c}"/><circle cx="${X(i)}" cy="${Y(q)}" r="11" fill="transparent" data-tip="${y} · ${MESES_L[i]}: ${fmt(q)} vítimas"/>`).join("");}).join("");
+    $("#ch-mes").innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Vítimas por mês e por ano">${g}${lines}</svg>`;
+  }
+  // ano
+  const ys=Object.keys(A.ano).sort(), my=Math.max(1,...Object.values(A.ano));
+  $("#ch-ano").innerHTML=ys.length?ys.map(y=>`<div class="ycol"><div class="n">${fmt(A.ano[y])}</div><div class="b" style="height:${A.ano[y]/my*140}px;background:${YCOL[y]||"var(--accent)"}" data-tip="${y}: ${fmt(A.ano[y])} vítimas"></div><div class="y">${y}</div></div>`).join(""):'<div class="empty" style="width:100%">Sem dados</div>';
+  // barras
+  const bars=(el,entries,labelFn,tot)=>{
+    const m=Math.max(1,...entries.map(e=>e[1]));
+    $(el).innerHTML=entries.length?entries.map(([k,v])=>`<div class="bar"><div class="name" title="${esc(labelFn(k))}">${esc(labelFn(k))}</div><div class="track"><div class="fill" style="width:${v/m*100}%"></div></div><div class="num">${fmt(v)}<span class="pct">${(v/tot*100).toFixed(0)}%</span></div></div>`).join(""):'<div class="empty">Sem dados</div>';
+  };
+  bars("#ch-nat",topN(A.nat,10),natLabel,A.sum||1);
+  bars("#ch-reg",topN(A.reg,10),k=>REG_LABEL[k]||k,A.sum||1);
+  bars("#ch-mun",topN(A.mun,10),k=>k,A.sum||1);
+}
+function niceStep(x){ const p=10**Math.floor(Math.log10(x||1)), f=x/p; return (f<=1?1:f<=2?2:f<=5?5:10)*p; }
+
+function renderEstruturas(){
+  const e=Object.fromEntries(META.estruturas.map(x=>[x.id,x]));
+  const card=(role,id)=>`<div class="ecard"><div class="role">${role}</div><h3>${e[id].nome} <span class="mono" style="font-size:13px;color:var(--muted)">${id}</span></h3><p>${ESTR[id].ex}</p>${diagram(id)}<p><b>Repare:</b> ${ESTR[id].nota}</p></div>`;
+  const b=$("#f-base").value,r=$("#f-res").value;
+  $("#ecards").innerHTML=card("Estrutura base",b)+(b===r?"":card("Estrutura de resultado",r));
+  if(b===r) $("#ecards").insertAdjacentHTML("beforeend",`<div class="ecard"><p>Você usou <b>${e[b].nome}</b> como base <i>e</i> como resultado. Troque um dos lados para comparar.</p></div>`);
+}
+
+function renderTable(){
+  const c=Object.fromEntries(DATA.colunas.map((n,i)=>[n,i])), rows=DATA.top, PS=10, pages=Math.max(1,Math.ceil(rows.length/PS));
+  page=Math.min(page,pages-1);
+  const slice=rows.slice(page*PS,page*PS+PS);
+  $("#tab-hint").textContent = DATA.stats.OUTPUT_RECORDS<DATA.stats.MATCHED_RECORDS ? `Mostrando os primeiros ${fmt(DATA.stats.OUTPUT_RECORDS)} de ${fmt(DATA.stats.MATCHED_RECORDS)} registros, na ordem em que a estrutura de resultado os entregou.` : `Todos os ${fmt(DATA.stats.MATCHED_RECORDS)} registros, na ordem em que a estrutura de resultado os entregou.`;
+  $("#tabela").innerHTML = rows.length ? `<thead><tr><th>#</th><th>Município</th><th>Região</th><th class="num">Ano</th><th>Mês</th><th>Tipo de crime</th><th class="num">Vítimas</th></tr></thead><tbody>`+
+    slice.map((r,i)=>`<tr><td class="pos">${page*PS+i+1}</td><td>${esc(r[c.MUNICIPIO])}</td><td>${esc(r[c.REGIAO])}</td><td class="num">${r[c.ANO]}</td><td>${MESES[+r[c.MES]-1]}</td><td><span class="badge">${esc(natLabel(r[c.GR_NATUREZA]))}</span></td><td class="num"><b>${r[c.QT_VITIMAS]}</b></td></tr>`).join("")+"</tbody>"
+    : `<tbody><tr><td class="empty">Nenhum registro passou pelos filtros. Tente afrouxar algum deles.</td></tr></tbody>`;
+  $("#pg-info").textContent = rows.length?`Página ${page+1} de ${pages}`:"";
+  $("#pg-prev").disabled=page===0; $("#pg-next").disabled=page>=pages-1;
+  $("#dl").disabled=!rows.length;
+}
+function download(){
+  const q=v=>/[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;
+  const csv="﻿"+[DATA.colunas,...DATA.top].map(r=>r.map(q).join(",")).join("\r\n");
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})); a.download="resultado.csv"; a.click();
+}
+
+/* ---------- corrida ---------- */
+async function race(){
+  const b=$("#go-race"); b.disabled=true; b.textContent="Correndo…"; $("#race-hint").textContent="Executando o programa em C várias vezes…";
+  try{ raceData=await post("/api/benchmark",config()); $("#race-tabs").hidden=false; $("#race-hint").textContent="Mesma consulta que está nos filtros ao lado."; renderRace(); }
+  catch(e){ $("#race-hint").textContent="Erro: "+e.message; }
+  b.disabled=false; b.textContent="Rodar de novo";
+}
+function renderRace(){
+  const rows=raceData[raceMode], P=[["Carga","LOAD_MS","var(--ph1)"],["Busca","SEARCH_MS","var(--ph2)"],["Inserção","RESULT_INSERT_MS","var(--ph3)"],["Escrita","WRITE_MS","var(--ph4)"]];
+  const tot=r=>P.reduce((a,p)=>a+r[p[1]],0), mx=Math.max(...rows.map(tot));
+  const cur=$(raceMode==="como_base"?"#f-base":"#f-res").value;
+  $("#race-leg").hidden=false; $("#race-leg").innerHTML=P.map(p=>`<span><i style="background:${p[2]}"></i>${p[0]}</span>`).join("")+`<span style="color:var(--muted)">· ${raceMode==="como_base"?`resultado fixo: <span class="mono">${raceData.fixa_resultado}</span>`:`base fixa: <span class="mono">${raceData.fixa_base}</span>`}</span>`;
+  const sorted=[...rows].sort((a,b)=>tot(a)-tot(b));
+  $("#race").innerHTML=sorted.map((r,i)=>`<div class="rrow ${r.id===cur?"sel":""}"><div class="rn">${i+1}º ${r.nome}</div><div class="rt">${P.map(p=>`<div style="width:${r[p[1]]/mx*100}%;background:${p[2]}" data-tip="${p[0]}: ${fms(r[p[1]])} ms"></div>`).join("")}</div><div class="rv">${fms(tot(r))} ms</div></div>`).join("");
+  const f=sorted[0],l=sorted.at(-1), ratio=tot(l)/Math.max(tot(f),0.001);
+  const ins=$("#race-insight"); ins.hidden=false;
+  ins.innerHTML=`Mais rápida: <b>${f.nome}</b> (${fms(tot(f))} ms). Mais lenta: <b>${l.nome}</b> (${fms(tot(l))} ms) — ${ratio<1.5?"praticamente empatadas":`cerca de <b>${ratio.toFixed(ratio<10?1:0).replace(".",",")}×</b> mais tempo`}. Os dados são os mesmos; o que muda é <i>como</i> cada estrutura guarda e percorre os registros.`;
+}
+
+init().catch(e=>setStatus("err","Não consegui falar com o servidor: "+e.message));
+</script>
+</body>
+</html>
